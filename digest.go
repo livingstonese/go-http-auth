@@ -28,8 +28,8 @@ type DigestAuth struct {
 	// Headers used by authenticator. Set to ProxyHeaders to use with
 	// proxy server. When nil, NormalHeaders are used.
 	Headers *Headers
+	Cache DigestCache
 
-	cache DigestCache
 	mutex sync.Mutex
 }
 
@@ -103,7 +103,7 @@ func (c digest_cache) Swap(i, j int) {
 */
 func (a *DigestAuth) RequireAuth(w http.ResponseWriter, r *http.Request) {
 	nonce := RandomKey()
-	a.cache.SetDigestClient(nonce, digest_client{nc: 0, last_seen: time.Now().UnixNano()})
+	a.Cache.SetDigestClient(nonce, digest_client{nc: 0, last_seen: time.Now().UnixNano()})
 	w.Header().Set(contentType, a.Headers.V().UnauthContentType)
 	w.Header().Set(a.Headers.V().Authenticate,
 		fmt.Sprintf(`Digest realm="%s", nonce="%s", opaque="%s", algorithm="MD5", qop="auth"`,
@@ -197,7 +197,7 @@ func (da *DigestAuth) CheckAuth(r *http.Request) (username string, authinfo *str
 		return "", nil
 	}
 
-	if client, ok := da.cache.GetDigestClient(auth["nonce"]); !ok {
+	if client, ok := da.Cache.GetDigestClient(auth["nonce"]); !ok {
 		return "", nil
 	} else {
 		if client.nc != 0 && client.nc >= nc && !da.IgnoreNonceCount {
@@ -205,7 +205,7 @@ func (da *DigestAuth) CheckAuth(r *http.Request) (username string, authinfo *str
 		}
 		client.nc = nc
 		client.last_seen = time.Now().UnixNano()
-		da.cache.SetDigestClient(auth["nonce"], client)
+		da.Cache.SetDigestClient(auth["nonce"], client)
 	}
 
 	resp_HA2 := H(":" + auth["uri"])
@@ -266,7 +266,7 @@ func (a *DigestAuth) NewContext(ctx context.Context, r *http.Request) context.Co
 	} else {
 		// return back digest WWW-Authenticate header
 		nonce := RandomKey()
-		a.cache.SetDigestClient(nonce, digest_client{nc: 0, last_seen: time.Now().UnixNano()})
+		a.Cache.SetDigestClient(nonce, digest_client{nc: 0, last_seen: time.Now().UnixNano()})
 		info.ResponseHeaders.Set(a.Headers.V().Authenticate,
 			fmt.Sprintf(`Digest realm="%s", nonce="%s", opaque="%s", algorithm="MD5", qop="auth"`,
 				a.Realm, nonce, a.Opaque))
@@ -280,7 +280,7 @@ func NewDigestAuthenticator(realm string, secrets SecretProvider) *DigestAuth {
 		Realm:            realm,
 		Secrets:          secrets,
 		PlainTextSecrets: false,
-		cache:            NewLocalDigestCache(),
+		Cache:            NewLocalDigestCache(),
 	}
 	return da
 }

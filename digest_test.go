@@ -12,7 +12,7 @@ func TestAuthDigest(t *testing.T) {
 	da := &DigestAuth{Opaque: "U7H+ier3Ae8Skd/g",
 		Realm:   "example.com",
 		Secrets: secrets,
-		cache:   NewLocalDigestCache()}
+		Cache:   NewLocalDigestCache()}
 	r := &http.Request{}
 	r.Method = "GET"
 	if u, _ := da.CheckAuth(r); u != "" {
@@ -29,7 +29,7 @@ func TestAuthDigest(t *testing.T) {
 	}
 
 	r.URL, _ = url.Parse("/t2")
-	da.cache.SetDigestClient(
+	da.Cache.SetDigestClient(
 		"Vb9BP/h81n3GpTTB", digest_client{nc: 0, last_seen: time.Now().UnixNano()})
 	if u, _ := da.CheckAuth(r); u != "test" {
 		t.Fatal("empty auth for legitimate client")
@@ -48,20 +48,20 @@ func TestAuthDigest(t *testing.T) {
 	da.IgnoreNonceCount = false
 
 	r.URL, _ = url.Parse("/")
-	da.cache.SetDigestClient(
+	da.Cache.SetDigestClient(
 		"Vb9BP/h81n3GpTTB", digest_client{nc: 0, last_seen: time.Now().UnixNano()})
 	if u, _ := da.CheckAuth(r); u != "" {
 		t.Fatal("non-empty auth for bad request path")
 	}
 
 	r.URL, _ = url.Parse("/t3")
-	da.cache.SetDigestClient(
+	da.Cache.SetDigestClient(
 		"Vb9BP/h81n3GpTTB", digest_client{nc: 0, last_seen: time.Now().UnixNano()})
 	if u, _ := da.CheckAuth(r); u != "" {
 		t.Fatal("non-empty auth for bad request path")
 	}
 
-	da.cache.SetDigestClient(
+	da.Cache.SetDigestClient(
 		"+RbVXSbIoa1SaJk1", digest_client{nc: 0, last_seen: time.Now().UnixNano()})
 	r.Header.Set("Authorization", `Digest username="test", realm="example.com", nonce="+RbVXSbIoa1SaJk1", uri="/", cnonce="NjE4NDkw", nc=00000001, qop="auth", response="c08918024d7faaabd5424654c4e3ad1c", opaque="U7H+ier3Ae8Skd/g", algorithm="MD5"`)
 	if u, _ := da.CheckAuth(r); u != "test" {
